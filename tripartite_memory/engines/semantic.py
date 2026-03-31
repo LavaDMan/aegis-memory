@@ -78,3 +78,7 @@ class SemanticEngine:
             )
             resp.raise_for_status()
             return point_id
+
+    async def close(self):
+        """Httpx client is used context-managed per request currently."""
+        pass

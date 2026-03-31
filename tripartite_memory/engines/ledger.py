@@ -50,3 +50,7 @@ class LedgerEngine:
                 res = await cur.fetchone()
                 await conn.commit()
                 return str(res[0])
+
+    async def close(self):
+        """No persistent connection to close for current psycopg implementation."""
+        pass

@@ -1,10 +1,9 @@
 import asyncio
-import uuid
 import structlog
 import os
-from datetime import datetime
-from dotenv import load_dotenv
+import re
 from typing import Any, List, Dict, Optional
+from dotenv import load_dotenv
 
 from .types import ContextPayload, MemoryHit, GraphNode, LedgerState
 from .engines.ledger import LedgerEngine
@@ -26,7 +25,8 @@ class MemoryCore:
         neo4j_uri: Optional[str] = None,
         neo4j_auth: Optional[tuple] = None,
         ollama_url: Optional[str] = None,
-        embedding_model: str = "nomic-embed-text"
+        embedding_model: str = "nomic-embed-text",
+        default_collection: str = "memory"
     ):
         # Load environment variables from .env if present
         load_dotenv()
@@ -35,6 +35,7 @@ class MemoryCore:
         self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL")
         self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
         self.neo4j_uri = neo4j_uri or os.getenv("NEO4J_URI")
+        self.default_collection = os.getenv("DEFAULT_COLLECTION", default_collection)
         
         # Neo4j Auth construction
         if neo4j_auth:
@@ -46,21 +47,38 @@ class MemoryCore:
         self.ollama_url = ollama_url or os.getenv("OLLAMA_URL", "http://localhost:11434")
         self.embedding_model = embedding_model
         
-        self.ledger = LedgerEngine(self.postgres_uri)
-        self.semantic = SemanticEngine(self.qdrant_url, self.ollama_url, embedding_model, api_key=self.qdrant_api_key)
-        self.graph = RelationalEngine(self.neo4j_uri, self.neo4j_user, self.neo4j_pass)
-        
         self.log = log.bind(component="MemoryCore")
 
-    async def ingest(self, content: str, actor: str, tags: Optional[List[str]] = None) -> Dict[str, Any]:
+        # Initialize and validate engine adapters
+        try:
+            if not self.postgres_uri:
+                raise ValueError("POSTGRES_URL is required but not provided.")
+            if not self.qdrant_url:
+                raise ValueError("QDRANT_URL is required but not provided.")
+            if not self.neo4j_uri:
+                raise ValueError("NEO4J_URI is required but not provided.")
+
+            self.ledger = LedgerEngine(self.postgres_uri)
+            self.semantic = SemanticEngine(self.qdrant_url, self.ollama_url, embedding_model, api_key=self.qdrant_api_key)
+            self.graph = RelationalEngine(self.neo4j_uri, self.neo4j_user, self.neo4j_pass)
+            self.log.info("engines_initialized")
+        except Exception as e:
+            self.log.error("engine_initialization_failed", error=str(e))
+            raise
+
+    async def ingest(self, content: str, actor: str, tags: Optional[List[str]] = None, collection: Optional[str] = None) -> Dict[str, Any]:
         """
         Unified write operation. Fans out the data to all three databases.
         """
-        self.log.info("unified_ingest_started", actor=actor, content_len=len(content))
+        if not content:
+            return {"success": False, "error": "Content cannot be empty"}
+
+        target_collection = collection or self.default_collection
+        self.log.info("unified_ingest_started", actor=actor, content_len=len(content), collection=target_collection)
         
         # Parallel Ingestion
         ledger_task = self.ledger.log_transaction(content, actor, tags)
-        semantic_task = self.semantic.upsert(content, actor, tags)
+        semantic_task = self.semantic.upsert(content, actor, tags, collection=target_collection)
         graph_task = self.graph.ingest_intent(content[:100], actor, tags)
         
         results = await asyncio.gather(
@@ -75,17 +93,21 @@ class MemoryCore:
             "errors": [str(r) for r in results if isinstance(r, Exception)]
         }
 
-    async def recall(self, intent: str, graph_depth: int = 2, collection: str = "john_context") -> ContextPayload:
+    async def recall(self, intent: str, graph_depth: int = 2, collection: Optional[str] = None) -> ContextPayload:
         """
         The Pre-Action Context Check.
         Retrieves state, semantic similarity, and blast radius in a single pass.
         Includes a verification layer to prevent semantic hallucinations.
         """
-        self.log.info("tripartite_recall_started", intent=intent, collection=collection)
+        if not intent:
+            return ContextPayload(intent="", status="UNKNOWN", knowledge_gaps=["Empty intent provided"])
+
+        target_collection = collection or self.default_collection
+        self.log.info("tripartite_recall_started", intent=intent, collection=target_collection)
         
         # Parallel Fan-out to all three storage engines
         ledger_task = self.ledger.get_active_mandates(limit=5)
-        semantic_task = self.semantic.search(intent, collection=collection, limit=10) # increase limit for filtering
+        semantic_task = self.semantic.search(intent, collection=target_collection, limit=10)
         graph_task = self.graph.get_blast_radius(intent, depth=graph_depth)
         
         results = await asyncio.gather(
@@ -93,6 +115,12 @@ class MemoryCore:
             return_exceptions=True
         )
         
+        # Check if all engines failed
+        if all(isinstance(r, Exception) for r in results):
+            error_msg = f"All tripartite engines failed: {results}"
+            self.log.error("total_recall_failure", error=error_msg)
+            raise RuntimeError(error_msg)
+
         ledger_res = results[0] if not isinstance(results[0], Exception) else []
         semantic_res = results[1] if not isinstance(results[1], Exception) else []
         graph_res = results[2] if not isinstance(results[2], Exception) else []
@@ -101,7 +129,6 @@ class MemoryCore:
             self.log.warning("partial_recall_failure", errors=[str(r) for r in results if isinstance(r, Exception)])
 
         # Hallucination Guard: Identify strict keywords (IPs, project codes)
-        # and verify they actually appear in the results.
         strict_keywords = self._extract_identifiers(intent)
         filtered_semantic = []
         gaps = []
@@ -117,7 +144,6 @@ class MemoryCore:
         # Recalculate Confidence based on filtered results
         confidence = self._calculate_confidence(filtered_semantic or semantic_res, graph_res, has_keyword_match=bool(filtered_semantic))
         
-        # If we had keywords but found no match, crash the confidence
         if strict_keywords and not filtered_semantic:
             confidence = confidence * 0.2
             status = "UNKNOWN"
@@ -138,7 +164,8 @@ class MemoryCore:
 
     def _extract_identifiers(self, text: str) -> List[str]:
         """Extracts IP addresses and specific node/project identifiers."""
-        import re
+        if not text:
+            return []
         # Match IPv4 addresses
         ips = re.findall(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', text)
         # Match node identifiers like .70 or .5 (if not part of IP)
@@ -148,18 +175,16 @@ class MemoryCore:
     def _calculate_confidence(self, hits: List[MemoryHit], nodes: List[GraphNode], has_keyword_match: bool = False) -> float:
         """Determine system certainty based on semantic similarity and graph density."""
         if not hits: return 0.0
-        
-        # Base semantic score
         max_semantic = max((h.score for h in hits), default=0.0)
-        
-        # Bonus for graph presence
         graph_bonus = 0.15 if nodes else 0.0
-        
-        # Bonus for strict keyword match
         keyword_bonus = 0.2 if has_keyword_match else 0.0
-        
         return min(max_semantic + graph_bonus + keyword_bonus, 1.0)
     
     async def close(self):
-        """Cleanup resources."""
-        await self.graph.close()
+        """Cleanup resources across all engines."""
+        await asyncio.gather(
+            self.ledger.close(),
+            self.semantic.close(),
+            self.graph.close(),
+            return_exceptions=True
+        )

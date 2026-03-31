@@ -30,9 +30,9 @@ class ContextPayload(BaseModel):
     confidence_score: float = 0.0
     built_at: datetime = Field(default_factory=datetime.utcnow)
     
-    historical_precedents: List[MemoryHit] = []
-    blast_radius: List[GraphNode] = []
-    hard_constraints: List[LedgerState] = []
-    knowledge_gaps: List[str] = []
+    historical_precedents: List[MemoryHit] = Field(default_factory=list)
+    blast_radius: List[GraphNode] = Field(default_factory=list)
+    hard_constraints: List[LedgerState] = Field(default_factory=list)
+    knowledge_gaps: List[str] = Field(default_factory=list)
     
-    metadata: Dict[str, Any] = {}
+    metadata: Dict[str, Any] = Field(default_factory=dict)
