@@ -21,6 +21,7 @@ async def run_bridge():
     recall_parser = subparsers.add_parser("recall", help="Retrieve context for an intent")
     recall_parser.add_argument("intent", help="The semantic intent to search for")
     recall_parser.add_argument("--collection", default=None, help="Collection to search (defaults to env DEFAULT_COLLECTION)")
+    recall_parser.add_argument("--suffix", action="store_true", help="Output as stable text suffix instead of JSON")
 
     # Ingest Command
     ingest_parser = subparsers.add_parser("ingest", help="Store new knowledge in the tripartite stack")

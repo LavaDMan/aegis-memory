@@ -185,6 +185,34 @@ class MemoryCore:
         keyword_bonus = 0.2 if has_keyword_match else 0.0
         return min(max_semantic + graph_bonus + keyword_bonus, 1.0)
     
+    def format_as_stable_suffix(self, payload: ContextPayload) -> str:
+        """
+        Formats the context payload into a stable string suitable for prefix caching.
+        Ordering is deterministic to maximize cache hits in Ollama/llama.cpp.
+        """
+        lines = ["### AEGIS SYSTEM CONTEXT (STABLE)"]
+        
+        # 1. Hard Constraints (Deterministic order by ID)
+        if payload.hard_constraints:
+            lines.append("\nRULES & CONSTRAINTS:")
+            for m in sorted(payload.hard_constraints, key=lambda x: x.id):
+                lines.append(f"- [{m.status}] {m.title}: {m.description}")
+
+        # 2. Historical Precedents (Sorted by semantic score)
+        if payload.historical_precedents:
+            lines.append("\nRELEVANT HISTORY:")
+            for h in sorted(payload.historical_precedents, key=lambda x: x.score, reverse=True):
+                text = h.payload.get("text", "No content")
+                lines.append(f"- {text}")
+
+        # 3. Knowledge Gaps
+        if payload.knowledge_gaps:
+            lines.append("\nIDENTIFIED GAPS:")
+            for gap in sorted(payload.knowledge_gaps):
+                lines.append(f"- {gap}")
+
+        return "\n".join(lines)
+
     async def close(self):
         """Cleanup resources across all engines."""
         await asyncio.gather(
