@@ -29,18 +29,32 @@ class SemanticEngine:
             headers["api-key"] = self.api_key
         return headers
 
-    async def search(self, text: str, collection: str = "execution_memory", limit: int = 5) -> List[MemoryHit]:
+    async def search(self, text: str, collection: str = "execution_memory", limit: int = 5, since: Optional[datetime] = None) -> List[MemoryHit]:
         """Semantic search against Qdrant."""
         vector = await self._embed(text)
         
+        query_payload = {
+            "vector": vector,
+            "limit": limit,
+            "with_payload": True
+        }
+
+        if since:
+            query_payload["filter"] = {
+                "must": [
+                    {
+                        "key": "captured_at",
+                        "range": {
+                            "gt": since.isoformat()
+                        }
+                    }
+                ]
+            }
+
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{self.url}/collections/{collection}/points/search",
-                json={
-                    "vector": vector,
-                    "limit": limit,
-                    "with_payload": True
-                },
+                json=query_payload,
                 headers=self._get_headers(),
                 timeout=30.0
             )

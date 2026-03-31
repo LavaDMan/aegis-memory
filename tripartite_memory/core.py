@@ -93,7 +93,7 @@ class MemoryCore:
             "errors": [str(r) for r in results if isinstance(r, Exception)]
         }
 
-    async def recall(self, intent: str, graph_depth: int = 2, collection: Optional[str] = None) -> ContextPayload:
+    async def recall(self, intent: str, graph_depth: int = 2, collection: Optional[str] = None, max_age_days: Optional[int] = None) -> ContextPayload:
         """
         The Pre-Action Context Check.
         Retrieves state, semantic similarity, and blast radius in a single pass.
@@ -103,11 +103,16 @@ class MemoryCore:
             return ContextPayload(intent="", status="UNKNOWN", knowledge_gaps=["Empty intent provided"])
 
         target_collection = collection or self.default_collection
-        self.log.info("tripartite_recall_started", intent=intent, collection=target_collection)
+        self.log.info("tripartite_recall_started", intent=intent, collection=target_collection, max_age_days=max_age_days)
         
+        # Determine cutoff date if specified
+        since_date = None
+        if max_age_days:
+            since_date = datetime.utcnow() - timedelta(days=max_age_days)
+
         # Parallel Fan-out to all three storage engines
         ledger_task = self.ledger.get_active_mandates(limit=5)
-        semantic_task = self.semantic.search(intent, collection=target_collection, limit=10)
+        semantic_task = self.semantic.search(intent, collection=target_collection, limit=10, since=since_date)
         graph_task = self.graph.get_blast_radius(intent, depth=graph_depth)
         
         results = await asyncio.gather(

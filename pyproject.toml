@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tripartite-memory"
-version = "0.1.2"
+version = "0.1.3"
 description = "The official AEGIS OS Tripartite Memory SDK for Autonomous Agents."
 readme = "README.md"
 authors = [
