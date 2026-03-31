@@ -6,10 +6,11 @@ from ..types import MemoryHit
 
 class SemanticEngine:
     """Qdrant adapter for Tripartite Semantic Memory."""
-    def __init__(self, url: str, embedding_url: str, model: str = "nomic-embed-text"):
+    def __init__(self, url: str, embedding_url: str, model: str = "nomic-embed-text", api_key: Optional[str] = None):
         self.url = url
         self.embedding_url = embedding_url
         self.model = model
+        self.api_key = api_key
 
     async def _embed(self, text: str) -> List[float]:
         """Generate vector via Ollama."""
@@ -21,6 +22,12 @@ class SemanticEngine:
             )
             resp.raise_for_status()
             return resp.json()["embedding"]
+
+    def _get_headers(self) -> Dict[str, str]:
+        headers = {}
+        if self.api_key:
+            headers["api-key"] = self.api_key
+        return headers
 
     async def search(self, text: str, collection: str = "execution_memory", limit: int = 5) -> List[MemoryHit]:
         """Semantic search against Qdrant."""
@@ -34,6 +41,7 @@ class SemanticEngine:
                     "limit": limit,
                     "with_payload": True
                 },
+                headers=self._get_headers(),
                 timeout=30.0
             )
             resp.raise_for_status()
@@ -46,11 +54,11 @@ class SemanticEngine:
 
     async def upsert(self, content: str, actor: str, tags: Optional[List[str]] = None, collection: str = "john_context") -> str:
         """Embed and upsert content to Qdrant."""
-        import uuid
         vector = await self._embed(content)
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, content))
         
         async with httpx.AsyncClient() as client:
+            # Note: Qdrant Cloud often prefers PUT for point upserts
             resp = await client.put(
                 f"{self.url}/collections/{collection}/points",
                 json={
@@ -65,6 +73,7 @@ class SemanticEngine:
                         }
                     }]
                 },
+                headers=self._get_headers(),
                 timeout=30.0
             )
             resp.raise_for_status()

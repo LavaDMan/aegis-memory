@@ -106,6 +106,20 @@ NEO4J_PASSWORD=your-secure-password
 OLLAMA_URL=http://10.0.0.100:11434
 ```
 
+## Managed Cloud Support ☁️
+`tripartite-memory` is compatible with major managed database providers. Just update your `.env` with the cloud connection strings:
+
+- **Vector (Qdrant):** Works with [Qdrant Cloud](https://qdrant.tech/cloud/). Set `QDRANT_API_KEY` in your environment.
+- **Graph (Neo4j):** Works with [Neo4j AuraDB](https://neo4j.com/cloud/aura/). Use your provided `bolt://` URI and password.
+- **Ledger (Postgres):** Works with [Neon](https://neon.tech/) or [Supabase](https://supabase.com/).
+
+```ini
+# Cloud Example
+QDRANT_URL=https://your-cluster.qdrant.tech
+QDRANT_API_KEY=your-api-key
+NEO4J_URI=bolt+s://your-instance.databases.neo4j.io
+```
+
 ## SBOM & Transparency 🛡️
 In alignment with AEGIS OS security standards, this repository includes a **Software Bill of Materials (SBOM)** in CycloneDX format. 
 - **View SBOM:** [sbom.json](./sbom.json)

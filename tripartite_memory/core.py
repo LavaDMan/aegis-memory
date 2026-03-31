@@ -33,6 +33,7 @@ class MemoryCore:
         
         self.postgres_uri = postgres_uri or os.getenv("POSTGRES_URL")
         self.qdrant_url = qdrant_url or os.getenv("QDRANT_URL")
+        self.qdrant_api_key = os.getenv("QDRANT_API_KEY")
         self.neo4j_uri = neo4j_uri or os.getenv("NEO4J_URI")
         
         # Neo4j Auth construction
@@ -46,7 +47,7 @@ class MemoryCore:
         self.embedding_model = embedding_model
         
         self.ledger = LedgerEngine(self.postgres_uri)
-        self.semantic = SemanticEngine(self.qdrant_url, self.ollama_url, embedding_model)
+        self.semantic = SemanticEngine(self.qdrant_url, self.ollama_url, embedding_model, api_key=self.qdrant_api_key)
         self.graph = RelationalEngine(self.neo4j_uri, self.neo4j_user, self.neo4j_pass)
         
         self.log = log.bind(component="MemoryCore")
