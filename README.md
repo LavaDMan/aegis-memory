@@ -79,14 +79,14 @@ if __name__ == "__main__":
 ```
 
 ## The Agent Protocol 🛡️
-`tripartite-memory` works best when the agent is "forced" to use it. We recommend adding a **Memory Protocol** to your agent's system prompt. See [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) for the exact snippet.
+`tripartite-memory` works best when the agent is "forced" to use it. I recommend adding a **Memory Protocol** to your agent's system prompt. See [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) for the exact snippet.
 
 ## Universal Integration
 - **Local Models (Ollama/LM Studio):** Inject the `recall()` JSON directly into the context window before the user's prompt.
 - **CLI Clients (Claude Code/Gemini CLI):** Wrap the SDK in a tool or use the provided **Bridge Script**.
 
 ## Bi-directional Memory Bridge 🔄
-We provide a ready-to-use bridge in [examples/bridge.py](./examples/bridge.py) that works on Linux, Mac, and Windows.
+A ready-to-use bridge is included in [examples/bridge.py](./examples/bridge.py) that works on Linux, Mac, and Windows.
 
 ```bash
 # Get Context
@@ -125,12 +125,12 @@ In alignment with AEGIS OS security standards, this repository includes a **Soft
 - **View SBOM:** [sbom.json](./sbom.json)
 - **Generate Fresh SBOM:** `python scripts/generate_sbom.py`
 
-## Why We Built This
-We built this SDK as the foundational memory layer for **AEGIS OS** — a bare-metal AI orchestration system designed to govern AI agents on real infrastructure using deterministic safety tiers (T0/T1/T2).
+## Why I Built This
+I built this SDK as the foundational memory layer for **AEGIS OS** — a bare-metal AI orchestration system designed to govern AI agents on real infrastructure using deterministic safety tiers (T0/T1/T2).
 
-While the core OS uses a Business Source License (BSL), we believe fundamental agentic memory should be open and standardized. `tripartite-memory` is 100% open-source (Apache 2.0).
+While the core OS uses a Business Source License (BSL), I believe fundamental agentic memory should be open and standardized. `tripartite-memory` is 100% open-source (Apache 2.0).
 
 Built by **[John Alva](https://alvasystemsarchitecture.com)** — infrastructure and AI automation for organizations that can't afford downtime. | [Alva Systems](https://alvasystemsarchitecture.com)
 
 ## Contributing
-PRs are welcome. If you are building agentic systems that require strict intent multiplexing and deterministic safety, we'd love to collaborate.
+PRs are welcome. If you are building agentic systems that require strict intent multiplexing and deterministic safety, I'd love to collaborate.
