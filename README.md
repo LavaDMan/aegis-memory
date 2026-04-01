@@ -130,7 +130,7 @@ We built this SDK as the foundational memory layer for **AEGIS OS** — a bare-m
 
 While the core OS uses a Business Source License (BSL), we believe fundamental agentic memory should be open and standardized. `tripartite-memory` is 100% open-source (Apache 2.0).
 
-Built by [Alva Systems](https://alvasystemsarchitecture.com) — infrastructure and AI automation for organizations that can't afford downtime.
+Built by **[John Alva](https://alvasystemsarchitecture.com)** — infrastructure and AI automation for organizations that can't afford downtime. | [Alva Systems](https://alvasystemsarchitecture.com)
 
 ## Contributing
 PRs are welcome. If you are building agentic systems that require strict intent multiplexing and deterministic safety, we'd love to collaborate.
