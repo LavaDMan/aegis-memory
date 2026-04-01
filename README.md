@@ -10,9 +10,9 @@ Most LLM agents fail in the same way: they forget what already happened. They re
 This is **AI Amnesia**.
 
 `tripartite-memory` is a unified async Python SDK that gives AI agents persistent, structured memory across three distinct layers. Before an agent takes action, it can answer:
-> “Has this failed before?”  
-> “What will this impact?”  
-> “Is this safe to execute?”
+> "Has this failed before?"  
+> "What will this impact?"  
+> "Is this safe to execute?"
 
 Instead of guessing, it **knows.**
 
@@ -126,9 +126,11 @@ In alignment with AEGIS OS security standards, this repository includes a **Soft
 - **Generate Fresh SBOM:** `python scripts/generate_sbom.py`
 
 ## Why We Built This
-We built this SDK as the foundational memory layer for **AEGIS OS**—a bare-metal orchestration layer designed to govern AI agents on real infrastructure using deterministic safety tiers (T0/T1/T2).
+We built this SDK as the foundational memory layer for **AEGIS OS** — a bare-metal AI orchestration system designed to govern AI agents on real infrastructure using deterministic safety tiers (T0/T1/T2).
 
 While the core OS uses a Business Source License (BSL), we believe fundamental agentic memory should be open and standardized. `tripartite-memory` is 100% open-source (Apache 2.0).
+
+Built by [Alva Systems](https://alvasystemsarchitecture.com) — infrastructure and AI automation for organizations that can't afford downtime.
 
 ## Contributing
 PRs are welcome. If you are building agentic systems that require strict intent multiplexing and deterministic safety, we'd love to collaborate.
