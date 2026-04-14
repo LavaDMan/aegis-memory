@@ -4,6 +4,14 @@ import sys
 import json
 import argparse
 import structlog
+
+# Redirect all structlog output to stderr so stdout stays clean for JSON capture.
+# MemoryCore configures structlog internally; this override must happen before import.
+structlog.configure(
+    logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
+    wrapper_class=structlog.make_filtering_bound_logger(20),  # INFO+
+)
+
 from tripartite_memory.core import MemoryCore
 
 # Use the modernized loop factory for Windows compatibility
@@ -36,8 +44,8 @@ async def run_bridge():
     try:
         memory = MemoryCore()
     except Exception as e:
-        print(f"❌ INITIALIZATION FAILED: {e}")
-        print("Please ensure your .env file is correctly configured.")
+        print(f"❌ INITIALIZATION FAILED: {e}", file=sys.stderr)
+        print("Please ensure your .env file is correctly configured.", file=sys.stderr)
         sys.exit(1)
 
     try:
@@ -58,7 +66,7 @@ async def run_bridge():
             parser.print_help()
 
     except Exception as e:
-        print(f"❌ OPERATION FAILED: {e}")
+        print(f"❌ OPERATION FAILED: {e}", file=sys.stderr)
         sys.exit(1)
     finally:
         await memory.close()
