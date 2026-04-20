@@ -8,49 +8,51 @@ class LedgerEngine:
     def __init__(self, uri: str):
         self.uri = uri
 
-    async def get_active_mandates(self, limit: int = 5) -> List[LedgerState]:
-        """Fetch high-priority pending or in-progress mandates."""
+    async def get_active_mandates(self, limit: int = 5, authorized_ring: int = 3) -> List[LedgerState]:
+        """Fetch high-priority mandates, filtered by authorized ring level."""
         async with await psycopg.AsyncConnection.connect(self.uri) as conn:
             async with conn.cursor(row_factory=psycopg.rows.dict_row) as cur:
                 await cur.execute("""
-                    SELECT id, title, description, status, priority
+                    SELECT id, title, description, status, priority, context_ring
                     FROM project_mandates
                     WHERE status IN ('IN_PROGRESS', 'APPROVED', 'PENDING')
+                      AND context_ring >= %s
                     ORDER BY 
                         CASE WHEN status = 'IN_PROGRESS' THEN 0 
                              WHEN status = 'APPROVED' THEN 1 
                              ELSE 2 END,
                         priority DESC
                     LIMIT %s
-                """, (limit,))
+                """, (authorized_ring, limit))
                 rows = await cur.fetchall()
                 return [LedgerState(
                     id=str(r["id"]),
                     title=r["title"],
                     description=r["description"],
                     status=r["status"],
-                    priority=r["priority"]
+                    priority=r["priority"],
+                    ring_level=r["context_ring"]
                 ) for r in rows]
 
-    async def log_transaction(self, content: str, actor: str, tags: Optional[List[str]] = None) -> str:
-        """Log a new memory entry to the ledger."""
+    async def log_transaction(self, content: str, actor: str, tags: Optional[List[str]] = None, ring_level: int = 3) -> str:
+        """Log a new memory entry to the ledger with a context ring stamp."""
         async with await psycopg.AsyncConnection.connect(self.uri) as conn:
             async with conn.cursor() as cur:
                 await cur.execute("""
-                    INSERT INTO aegis_change_log (change_type, title, summary, details, affected_ai)
-                    VALUES (%s, %s, %s, %s, %s)
+                    INSERT INTO aegis_change_log (change_type, title, summary, details, affected_ai, context_ring)
+                    VALUES (%s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
                     "session_memory",
                     f"Memory: {content[:50]}...",
                     content[:200],
                     psycopg.types.json.Json({"actor": actor, "tags": tags or []}),
-                    ['agent_os', 'mcp_hub']
+                    ['agent_os', 'mcp_hub'],
+                    ring_level
                 ))
                 res = await cur.fetchone()
                 await conn.commit()
                 return str(res[0])
 
     async def close(self):
-        """No persistent connection to close for current psycopg implementation."""
         pass

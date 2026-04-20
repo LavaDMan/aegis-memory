@@ -278,7 +278,7 @@ class MemoryCore:
         Formats the context payload into a stable string suitable for prefix caching.
         Ordering is deterministic to maximize cache hits in Ollama/llama.cpp.
         """
-        lines = ["### AEGIS SYSTEM CONTEXT (STABLE)"]
+        lines = ["### SYSTEM CONTEXT (STABLE)"]
         
         # 1. Hard Constraints (Deterministic order by ID)
         if payload.hard_constraints:

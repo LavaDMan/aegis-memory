@@ -52,7 +52,7 @@ QDRANT_API_KEY: Optional[str] = os.getenv("QDRANT_API_KEY")
 
 PRUNING_COLLECTIONS: List[str] = [
     c.strip()
-    for c in os.getenv("PRUNING_COLLECTIONS", "execution_memory,john_context,forge_context").split(",")
+    for c in os.getenv("PRUNING_COLLECTIONS", "execution_memory,operator_context,agent_context").split(",")
     if c.strip()
 ]
 PRUNING_MIN_AGE_DAYS: int = _env_int("PRUNING_MIN_AGE_DAYS", 180)

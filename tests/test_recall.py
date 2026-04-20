@@ -7,7 +7,7 @@ async def test_sdk_recall():
     print("🚀 Initializing aegis-memory SDK...")
     
     # Use environment variables or defaults
-    POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://langfuse:langfuse@localhost:5432/aegis_local")
+    POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://user:password@localhost:5432/mydb")
     QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
     NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
     NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")

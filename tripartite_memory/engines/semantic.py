@@ -71,7 +71,7 @@ class SemanticEngine:
                 ring_level=r.get("payload", {}).get("ring_level", 3)
             ) for r in results]
 
-    async def upsert(self, content: str, actor: str, tags: Optional[List[str]] = None, collection: str = "john_context", ring_level: int = 3) -> str:
+    async def upsert(self, content: str, actor: str, tags: Optional[List[str]] = None, collection: str = "operator_context", ring_level: int = 3) -> str:
         """Embed and upsert content with a Context Ring stamp."""
         vector = await self._embed(content)
         point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, content))
@@ -99,7 +99,7 @@ class SemanticEngine:
             resp.raise_for_status()
             return point_id
 
-    async def touch_validated_at(self, point_id: str, collection: str = "john_context") -> None:
+    async def touch_validated_at(self, point_id: str, collection: str = "operator_context") -> None:
         """Refresh last_validated_at on an existing point without re-embedding."""
         async with httpx.AsyncClient() as client:
             resp = await client.post(
@@ -113,7 +113,7 @@ class SemanticEngine:
             )
             resp.raise_for_status()
 
-    async def mark_superseded(self, point_id: str, collection: str = "john_context", reason: str = "") -> None:
+    async def mark_superseded(self, point_id: str, collection: str = "operator_context", reason: str = "") -> None:
         """
         Mark a semantic point as superseded rather than deleting it.
         Preserves audit trail; superseded points are skipped by the conflict resolver.
@@ -136,7 +136,7 @@ class SemanticEngine:
 
     async def scroll_collection(
         self,
-        collection: str = "john_context",
+        collection: str = "operator_context",
         batch_size: int = 256,
     ) -> List[Dict[str, Any]]:
         """
