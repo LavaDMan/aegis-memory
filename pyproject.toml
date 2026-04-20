@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tripartite-memory"
-version = "0.1.4"
+version = "0.2.0"
 description = "The official AEGIS OS Tripartite Memory SDK for Autonomous Agents."
 readme = "README.md"
 authors = [
-  { name = "LavaLabs", email = "founders@lavalabs.ai" }
+  { name = "Alva Systems Architecture LLC", email = "founders@alvasystemsarchitecture.com" }
 ]
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"

@@ -120,8 +120,42 @@ QDRANT_API_KEY=your-api-key
 NEO4J_URI=bolt+s://your-instance.databases.neo4j.io
 ```
 
-## SBOM & Transparency 🛡️
-In alignment with AEGIS OS security standards, this repository includes a **Software Bill of Materials (SBOM)** in CycloneDX format. 
+## Injection Guard 🛡️
+
+`tripartite_memory.guards.InjectionGuard` is a zero-dependency text scanner for detecting prompt injection and shell command injection patterns in LLM agent pipelines. Use it to validate user input, inter-agent messages, or any text before it reaches a model or tool executor.
+
+```python
+from tripartite_memory.guards import InjectionGuard
+
+# Quick boolean check
+if not InjectionGuard.is_safe(user_input):
+    raise ValueError("Input rejected by injection guard")
+
+# Full report
+result = InjectionGuard.scan_text_for_injection(user_input)
+# {
+#   "score": 50,           # 0 = clean, ≥50 = high-risk
+#   "findings": [{"severity": "HIGH", "description": "...", "pattern": "..."}],
+#   "summary": "Injection scan score: 50. 1 finding(s)."
+# }
+```
+
+**What it detects (HIGH risk, score +50 each):**
+- `shell=True` in subprocess, `os.system()`, `eval()`, `exec()`
+- Container privilege escalation (`--privileged`, `cap_add SYS_ADMIN`)
+- Prompt override attempts (`ignore previous instructions`, `act as`, etc.)
+- HTML/JS injection (`<script>`, `javascript:`)
+- Malicious shell commands (`rm -rf`, `sudo`, `wget`, `curl`, etc.)
+- Template injection with shell operators (`${foo;rm -rf}`)
+- Backtick shell execution (`` `rm -rf /` `` — not triggered by markdown inline code)
+
+**Medium risk (score +10 each):** security TODOs, `DEBUG=True`, logical operator chaining.
+
+Scores cap at 100. Pure stdlib — no install overhead.
+
+## SBOM & Transparency
+
+This repository includes a **Software Bill of Materials (SBOM)** in CycloneDX format.
 - **View SBOM:** [sbom.json](./sbom.json)
 - **Generate Fresh SBOM:** `python scripts/generate_sbom.py`
 
@@ -131,6 +165,25 @@ I built this SDK as the foundational memory layer for **AEGIS OS** — a bare-me
 While the core OS uses a Business Source License (BSL), I believe fundamental agentic memory should be open and standardized. `tripartite-memory` is 100% open-source (Apache 2.0).
 
 Built by **[John Alva](https://alvasystemsarchitecture.com)** — infrastructure and AI automation for organizations that can't afford downtime. | [Alva Systems](https://alvasystemsarchitecture.com)
+
+## Changelog
+
+### v0.2.0
+- **New:** `tripartite_memory.guards.InjectionGuard` — zero-dependency prompt and shell injection scanner (stdlib only)
+- **New:** `InjectionGuard.is_safe(text, threshold)` convenience method
+- **Fix:** Narrowed backtick injection pattern — markdown inline code no longer triggers false positive
+- **Fix:** Narrowed template literal pattern to only flag when shell operators are embedded (`${foo;rm}` triggers, `${VAR}` does not)
+- **Lifecycle:** `nightly_pruning.py` default collections updated to generic names
+- **Internal:** `format_as_stable_suffix` header string generalized
+
+### v0.1.4
+- Add stable suffix decoding support for prefix caching
+
+### v0.1.3
+- Add support for staleness filtering (`max_age_days`)
+
+### v0.1.2
+- Code review fixes and hardening
 
 ## Contributing
 PRs are welcome. If you are building agentic systems that require strict intent multiplexing and deterministic safety, I'd love to collaborate.
