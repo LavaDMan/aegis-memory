@@ -63,8 +63,8 @@ class InjectionGuard:
          "Security-related TODO comment"),
         (r'(?i)DEBUG\s*=\s*True',
          "DEBUG mode enabled (potential information leak)"),
-        (r'&&|\|\|',
-         "Logical operator chaining (review in shell/command context)"),
+        (r'(?:^|[;\s`])\S+\s*(?:&&|\|\|)\s*\S+',
+         "Shell command chaining (&&/|| between commands)"),
     ]
 
     @staticmethod

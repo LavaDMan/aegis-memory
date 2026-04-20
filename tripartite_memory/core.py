@@ -2,7 +2,7 @@ import asyncio
 import structlog
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, List, Dict, Optional
 from dotenv import load_dotenv
 
@@ -111,7 +111,7 @@ class MemoryCore:
         # Determine cutoff date if specified
         since_date = None
         if max_age_days:
-            since_date = datetime.utcnow() - timedelta(days=max_age_days)
+            since_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
         # Parallel Fan-out to all three storage engines with Ring enforcement
         ledger_task = self.ledger.get_active_mandates(limit=5, authorized_ring=authorized_ring)
@@ -132,9 +132,13 @@ class MemoryCore:
         ledger_res = results[0] if not isinstance(results[0], Exception) else []
         semantic_res = results[1] if not isinstance(results[1], Exception) else []
         graph_res = results[2] if not isinstance(results[2], Exception) else []
-        
-        if any(isinstance(r, Exception) for r in results):
-            self.log.warning("partial_recall_failure", errors=[str(r) for r in results if isinstance(r, Exception)])
+
+        failed_engines = [
+            name for name, r in zip(("ledger", "semantic", "graph"), results)
+            if isinstance(r, Exception)
+        ]
+        if failed_engines:
+            self.log.warning("partial_recall_failure", failed=failed_engines, errors=[str(r) for r in results if isinstance(r, Exception)])
 
         # Hallucination Guard: Identify strict keywords (IPs, project codes)
         strict_keywords = self._extract_identifiers(intent)
@@ -159,6 +163,8 @@ class MemoryCore:
         if strict_keywords and not filtered_semantic:
             confidence = confidence * 0.2
             status = "UNKNOWN"
+        elif failed_engines:
+            status = "DEGRADED"
         else:
             status = "KNOWN" if confidence > 0.8 else "ADJACENT" if confidence > 0.4 else "UNKNOWN"
 
@@ -173,6 +179,7 @@ class MemoryCore:
             intent=intent,
             status=status,
             confidence_score=round(confidence, 2),
+            authorized_ring=authorized_ring,
             historical_precedents=active_semantic[:5],
             blast_radius=graph_res,
             hard_constraints=ledger_res,
@@ -180,6 +187,7 @@ class MemoryCore:
             metadata={
                 "resolution_decisions": [d.as_dict() for d in resolution_decisions],
                 "resolution_store_priority": ["ledger", "graph", "semantic"],
+                "failed_engines": failed_engines,
             }
         )
 
@@ -225,7 +233,7 @@ class MemoryCore:
         threshold_365 = int(os.getenv("TRIPARTITE_DECAY_THRESHOLD_DAYS_365", "365"))
         steps = [(threshold_365, 0.2), (threshold_180, 0.5), (threshold_90, 0.8)]
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         for hit in hits:
             # Skip already-superseded entries — they should not influence recall ranking
             if hit.payload.get("superseded"):

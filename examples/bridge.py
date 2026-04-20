@@ -14,6 +14,29 @@ structlog.configure(
 
 from tripartite_memory.core import MemoryCore
 
+# Ph164: auto-compress oversized content before Qdrant ingest
+_KERNEL_TOKEN_THRESHOLD = int(os.getenv("MAX_KERNEL_TOKENS", "500"))
+
+def _maybe_compress(content: str) -> str:
+    """Compress content if it exceeds the kernel token threshold."""
+    try:
+        import tiktoken
+        enc = tiktoken.get_encoding("cl100k_base")
+        if len(enc.encode(content)) <= _KERNEL_TOKEN_THRESHOLD:
+            return content
+        # Lazy import to avoid hard dep when not needed
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "services"))
+        from agent_os.knowledge_kernel import compress_conversation_log
+        kernel = compress_conversation_log({"messages": [content]}, strategy="recursive")
+        print(
+            json.dumps({"kernel_compression": kernel["scores"]}),
+            file=sys.stderr,
+        )
+        return kernel["summary"]
+    except Exception as e:
+        print(f"⚠️  kernel compression skipped: {e}", file=sys.stderr)
+        return content
+
 # Use the modernized loop factory for Windows compatibility
 if sys.platform == 'win32':
     import selectors
@@ -54,8 +77,9 @@ async def run_bridge():
             print(context.model_dump_json(indent=2))
         
         elif args.command == "ingest":
+            ingested_content = _maybe_compress(args.content)
             res = await memory.ingest(
-                content=args.content,
+                content=ingested_content,
                 actor=args.actor,
                 tags=args.tags,
                 collection=args.collection

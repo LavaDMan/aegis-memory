@@ -46,15 +46,32 @@ pip install tripartite-memory
 ```
 
 ## Quickstart
-Initialize the `MemoryCore` with your database credentials (or use a `.env` file).
+
+**Step 1 — Configure your databases** (copy `.env.example` and fill in your connection strings):
+
+```bash
+cp .env.example .env
+# Edit .env with your Postgres, Qdrant, Neo4j, and Ollama URLs
+```
+
+Or pass credentials directly to the constructor (see below).
+
+**Step 2 — Use the SDK:**
 
 ```python
 import asyncio
 from tripartite_memory.core import MemoryCore
 
 async def main():
-    # Automatically loads from .env
+    # Option A: reads POSTGRES_URL, QDRANT_URL, NEO4J_URI from .env
     memory = MemoryCore()
+
+    # Option B: pass credentials explicitly
+    # memory = MemoryCore(
+    #     postgres_uri="postgresql://user:pass@localhost:5432/mydb",
+    #     qdrant_url="http://localhost:6333",
+    #     neo4j_uri="bolt://localhost:7687",
+    # )
 
     # 1. Unified Ingestion (Write to all 3 databases simultaneously)
     await memory.ingest(
@@ -67,16 +84,23 @@ async def main():
     # Give your agent complete situational awareness before it touches production.
     context = await memory.recall(
         intent="Restart the Nginx service to apply new SSL certificates.",
-        graph_depth=2
+        graph_depth=2,
+        # collection="operator_context",  # override default collection
+        # max_age_days=90,                # ignore memories older than 90 days
+        # authorized_ring=2,              # ring-level access control (0=highest, 3=public)
     )
 
-    print(context.status) # "KNOWN", "ADJACENT", or "UNKNOWN"
-    print(context.blast_radius) # Neo4j dependent nodes
+    print(context.status)               # "KNOWN", "ADJACENT", "UNKNOWN", or "DEGRADED"
+    print(context.blast_radius)         # Neo4j dependent nodes
     print(context.historical_precedents) # Qdrant vector matches
+    print(context.authorized_ring)      # ring level used for this query
+    print(context.metadata["failed_engines"])  # [] or ["ledger", "semantic", etc.]
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+> **Note:** `MemoryCore()` validates that all three database URLs are available at construction time. If any are missing it raises `ValueError` immediately — it does not defer until first use. Ensure your `.env` is loaded or credentials are passed before instantiating.
 
 ## The Agent Protocol 🛡️
 `tripartite-memory` works best when the agent is "forced" to use it. I recommend adding a **Memory Protocol** to your agent's system prompt. See [SYSTEM_PROMPT.md](./SYSTEM_PROMPT.md) for the exact snippet.
@@ -167,6 +191,15 @@ While the core OS uses a Business Source License (BSL), I believe fundamental ag
 Built by **[John Alva](https://alvasystemsarchitecture.com)** — infrastructure and AI automation for organizations that can't afford downtime. | [Alva Systems](https://alvasystemsarchitecture.com)
 
 ## Changelog
+
+### v0.2.1
+- **Fix:** `authorized_ring` now correctly populated in `ContextPayload` (was always defaulting to 3)
+- **New:** `status = "DEGRADED"` when one or more engines fail — callers can now detect partial availability
+- **New:** `metadata["failed_engines"]` lists which stores were unavailable on a given recall
+- **Fix:** Timeouts now configurable via `TRIPARTITE_OLLAMA_TIMEOUT` and `TRIPARTITE_QDRANT_TIMEOUT` env vars (default 60s/30s)
+- **Fix:** `&&`/`||` injection pattern narrowed — logical operators in prose no longer trigger false positives; only shell command-chaining patterns are flagged
+- **Fix:** `datetime.utcnow()` replaced with timezone-aware `datetime.now(timezone.utc)` throughout
+- **Docs:** Quickstart updated with explicit `.env` setup step, constructor alternatives, and all `recall()` parameters documented
 
 ### v0.2.0
 - **New:** `tripartite_memory.guards.InjectionGuard` — zero-dependency prompt and shell injection scanner (stdlib only)

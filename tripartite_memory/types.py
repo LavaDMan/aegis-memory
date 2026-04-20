@@ -29,7 +29,7 @@ class LedgerState(BaseModel):
 class ContextPayload(BaseModel):
     """The unified tripartite context object returned to the agent."""
     intent: str
-    status: str = Field(..., description="KNOWN, ADJACENT, or UNKNOWN based on memory density")
+    status: str = Field(..., description="KNOWN, ADJACENT, UNKNOWN, or DEGRADED (one or more engines unavailable)")
     confidence_score: float = 0.0
     built_at: datetime = Field(default_factory=datetime.utcnow)
     authorized_ring: int = 3 # The ring level used for this query

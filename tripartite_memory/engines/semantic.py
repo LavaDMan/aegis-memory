@@ -1,8 +1,12 @@
 import httpx
+import os
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from ..types import MemoryHit
+
+_OLLAMA_TIMEOUT = float(os.getenv("TRIPARTITE_OLLAMA_TIMEOUT", "60"))
+_QDRANT_TIMEOUT = float(os.getenv("TRIPARTITE_QDRANT_TIMEOUT", "30"))
 
 class SemanticEngine:
     """Qdrant adapter for Tripartite Semantic Memory."""
@@ -18,7 +22,7 @@ class SemanticEngine:
             resp = await client.post(
                 f"{self.embedding_url}/api/embeddings",
                 json={"model": self.model, "prompt": text},
-                timeout=60.0
+                timeout=_OLLAMA_TIMEOUT,
             )
             resp.raise_for_status()
             return resp.json()["embedding"]
@@ -60,7 +64,7 @@ class SemanticEngine:
                 f"{self.url}/collections/{collection}/points/search",
                 json=query_payload,
                 headers=self._get_headers(),
-                timeout=30.0
+                timeout=_QDRANT_TIMEOUT
             )
             resp.raise_for_status()
             results = resp.json().get("result", [])
@@ -94,7 +98,7 @@ class SemanticEngine:
                     }]
                 },
                 headers=self._get_headers(),
-                timeout=30.0
+                timeout=_QDRANT_TIMEOUT
             )
             resp.raise_for_status()
             return point_id
@@ -109,7 +113,7 @@ class SemanticEngine:
                     "points": [point_id],
                 },
                 headers=self._get_headers(),
-                timeout=15.0,
+                timeout=_QDRANT_TIMEOUT / 2,
             )
             resp.raise_for_status()
 
@@ -130,7 +134,7 @@ class SemanticEngine:
                     "points": [point_id],
                 },
                 headers=self._get_headers(),
-                timeout=15.0,
+                timeout=_QDRANT_TIMEOUT / 2,
             )
             resp.raise_for_status()
 
@@ -160,7 +164,7 @@ class SemanticEngine:
                     f"{self.url}/collections/{collection}/points/scroll",
                     json=body,
                     headers=self._get_headers(),
-                    timeout=30.0,
+                    timeout=_QDRANT_TIMEOUT,
                 )
                 resp.raise_for_status()
                 data = resp.json().get("result", {})
