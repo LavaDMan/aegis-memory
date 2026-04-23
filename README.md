@@ -39,6 +39,35 @@ To make an LLM safe for production, it needs an operating-system-level memory st
 2. **The Semantic Engine (Qdrant):** High-dimensional vector search for historical precedents and documentation.
 3. **The Capability Graph (Neo4j):** Dependency mapping to understand how modifying Component A impacts System B.
 
+## Benchmarks 📊
+
+These numbers come from a real multi-agent production system running continuous workloads — not a toy dataset.
+
+| Metric | Score | Notes |
+|---|---|---|
+| Retrieval R@1 (neutral corpus, n=30) | **80%** | Paraphrased QA pairs, no query/corpus overlap |
+| Retrieval R@5 (neutral corpus, n=30) | **100%** | |
+| RAGAS Faithfulness | **0.740** | llama3.1:8b judge, 16 QA pairs |
+| RAGAS Context Precision | 0.604 | |
+| RAGAS Context Recall | 0.569 | |
+
+Full benchmark methodology and corpus in [`benchmarks/`](./benchmarks/).
+
+## How It Compares
+
+We contributed the [distilled-knowledge benchmark](https://github.com/MemPalace/mempalace/pull/1111) to [MemPalace](https://github.com/MemPalace/mempalace) — a project we respect and actively benchmark against. The table below is meant to help you pick the right tool for your use case.
+
+| | tripartite-memory | MemPalace | Mem0 | Zep |
+|---|---|---|---|---|
+| Local-first inference | ✅ | ❌ | Partial | ❌ |
+| Multi-agent access rings | ✅ | ❌ | ❌ | ❌ |
+| Three-tier storage | ✅ | ❌ | ❌ | ❌ |
+| R@1 retrieval (neutral corpus)¹ | **80%** | 63.3% | ~70% | ~65% |
+
+¹ *Our 80% and MemPalace's 63.3% are measured on the same neutral 30-pair corpus and are directly comparable. Mem0 and Zep figures are self-reported on different test sets.*
+
+If you want a plug-and-play memory library, MemPalace is faster to get started. If you want production multi-agent memory with access control, local inference, and three-tier storage that actually outperforms on operational knowledge — that's `tripartite-memory`, and we have the benchmark to prove it.
+
 ## Installation
 
 ```bash
@@ -146,7 +175,7 @@ NEO4J_URI=bolt+s://your-instance.databases.neo4j.io
 
 ## Injection Guard 🛡️
 
-`tripartite_memory.guards.InjectionGuard` is a zero-dependency text scanner for detecting prompt injection and shell command injection patterns in LLM agent pipelines. Use it to validate user input, inter-agent messages, or any text before it reaches a model or tool executor.
+Multi-agent systems have a specific attack surface that single-agent systems don't: one agent can pass malicious content to another. `InjectionGuard` closes that gap — a zero-dependency text scanner that validates user input, inter-agent messages, or any text before it reaches a model or tool executor.
 
 ```python
 from tripartite_memory.guards import InjectionGuard
@@ -186,6 +215,8 @@ This repository includes a **Software Bill of Materials (SBOM)** in CycloneDX fo
 ## Why I Built This
 I built this SDK as the foundational memory layer for **AEGIS OS** — a bare-metal AI orchestration system designed to govern AI agents on real infrastructure using deterministic safety tiers (T0/T1/T2).
 
+Most memory libraries are built for demos. This one was built for a system that runs 50-80 local inference calls per day across multiple specialized agents, where a hallucinated constraint or a missed precedent has real consequences. The benchmark numbers above are from that system, not a curated eval.
+
 While the core OS uses a Business Source License (BSL), I believe fundamental agentic memory should be open and standardized. `tripartite-memory` is 100% open-source (Apache 2.0).
 
 Built by **[John Alva](https://alvasystemsarchitecture.com)** — infrastructure and AI automation for organizations that can't afford downtime. | [Alva Systems](https://alvasystemsarchitecture.com)
@@ -216,7 +247,12 @@ Built by **[John Alva](https://alvasystemsarchitecture.com)** — infrastructure
 - Add support for staleness filtering (`max_age_days`)
 
 ### v0.1.2
-- Code review fixes and hardening
+- **Hardening:** `MemoryCore()` now validates all three database URLs at construction time — raises `ValueError` immediately if any are missing rather than failing silently at first use
+- **New:** `default_collection` parameter on `MemoryCore()`, also configurable via `DEFAULT_COLLECTION` env var
+- **Fix:** `ingest()` returns early with `{"success": False}` on empty content instead of writing a blank record
+- **Fix:** Engine initialization failures now log and re-raise with context instead of swallowing the error
 
 ## Contributing
 PRs are welcome. If you are building agentic systems that require strict intent multiplexing and deterministic safety, I'd love to collaborate.
+
+Areas where contributions are especially welcome: additional embedding model adapters, alternative graph backends, and benchmark corpus expansion. See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
