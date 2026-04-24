@@ -114,8 +114,9 @@ class MemoryCore:
             since_date = datetime.now(timezone.utc) - timedelta(days=max_age_days)
 
         # Parallel Fan-out to all three storage engines with Ring enforcement
+        # Ph328: use hybrid_search (semantic + keyword) instead of pure semantic
         ledger_task = self.ledger.get_active_mandates(limit=5, authorized_ring=authorized_ring)
-        semantic_task = self.semantic.search(intent, collection=target_collection, limit=10, since=since_date, authorized_ring=authorized_ring)
+        semantic_task = self.semantic.hybrid_search(intent, collection=target_collection, limit=10, since=since_date, authorized_ring=authorized_ring)
         graph_task = self.graph.get_blast_radius(intent, depth=graph_depth, authorized_ring=authorized_ring)
         
         results = await asyncio.gather(
@@ -156,6 +157,25 @@ class MemoryCore:
         # Ph161.1 — Apply recency decay to semantic scores
         active_semantic = filtered_semantic if filtered_semantic else semantic_res
         active_semantic = self._apply_recency_decay(active_semantic)
+
+        # Ph391 — Tag graph additive merge: inject Neo4j tag-matched Qdrant results
+        try:
+            tag_titles = await self.graph.get_tag_matched_titles(intent, authorized_ring)
+            if tag_titles:
+                tag_hits = await self.semantic.fetch_by_title_prefixes(
+                    tag_titles, collection=target_collection, authorized_ring=authorized_ring
+                )
+                if tag_hits:
+                    existing_texts = {h.payload.get("text", "") for h in active_semantic}
+                    new_hits = [h for h in tag_hits if h.payload.get("text", "") not in existing_texts]
+                    if new_hits:
+                        active_semantic = sorted(
+                            active_semantic + new_hits,
+                            key=lambda h: h.score,
+                            reverse=True,
+                        )
+        except Exception:
+            pass  # tag graph lookup is best-effort; never block recall
 
         # Recalculate Confidence based on decay-adjusted results
         confidence = self._calculate_confidence(active_semantic, graph_res, has_keyword_match=bool(filtered_semantic))
